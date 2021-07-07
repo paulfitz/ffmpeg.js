@@ -20,5 +20,5 @@
 	ignore = dirty
 [submodule "build/ffmpeg-mp4"]
 	path = build/ffmpeg-mp4
-	url = https://git.ffmpeg.org/ffmpeg.git
+	url = https://github.com/paulfitz/ffmpeg.git
 	ignore = dirty

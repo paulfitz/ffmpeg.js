@@ -6,9 +6,12 @@ PRE_JS = build/pre.js
 POST_JS_SYNC = build/post-sync.js
 POST_JS_WORKER = build/post-worker.js
 
-COMMON_FILTERS = aresample scale crop overlay hstack vstack
-COMMON_DEMUXERS = matroska ogg mov mp3 wav image2 concat
-COMMON_DECODERS = vp8 h264 vorbis opus mp3 aac pcm_s16le mjpeg png
+COMMON_FILTERS = scale
+# aresample scale crop overlay hstack vstack
+COMMON_DEMUXERS = image2
+# matroska ogg mov mp3 wav image2 concat
+COMMON_DECODERS = h264 png
+# vp8 h264 vorbis opus mp3 aac pcm_s16le mjpeg png
 
 WEBM_MUXERS = webm ogg null
 WEBM_ENCODERS = libvpx_vp8 libopus
@@ -18,15 +21,17 @@ WEBM_SHARED_DEPS = \
 	build/opus/dist/lib/libopus.so \
 	build/libvpx/dist/lib/libvpx.so
 
-MP4_MUXERS = mp4 mp3 null
-MP4_ENCODERS = libx264 libmp3lame aac
+MP4_MUXERS = mp4
+# null
+# mp3 null
+MP4_ENCODERS = libx264
+# libmp3lame aac
 FFMPEG_MP4_BC = build/ffmpeg-mp4/ffmpeg.bc
 FFMPEG_MP4_PC_PATH = ../x264/dist/lib/pkgconfig
 MP4_SHARED_DEPS = \
-	build/lame/dist/lib/libmp3lame.so \
 	build/x264/dist/lib/libx264.so
 
-all: webm mp4
+all: mp4
 webm: ffmpeg-webm.js ffmpeg-worker-webm.js
 mp4: ffmpeg-mp4.js ffmpeg-worker-mp4.js
 
@@ -146,6 +151,7 @@ build/x264/dist/lib/libx264.so:
 # - <https://ffmpeg.org/pipermail/libav-user/2013-February/003698.html>
 FFMPEG_COMMON_ARGS = \
 	--cc=emcc \
+	--cxx=emcc \
 	--ranlib=emranlib \
 	--enable-cross-compile \
 	--target-os=none \
@@ -205,14 +211,15 @@ build/ffmpeg-mp4/ffmpeg.bc: $(MP4_SHARED_DEPS)
 		$(FFMPEG_COMMON_ARGS) \
 		$(addprefix --enable-encoder=,$(MP4_ENCODERS)) \
 		$(addprefix --enable-muxer=,$(MP4_MUXERS)) \
+		--extra-cflags="-s USE_ZLIB=1" \
 		--enable-gpl \
-		--enable-libmp3lame \
 		--enable-libx264 \
-		--extra-cflags="-s USE_ZLIB=1 -I../lame/dist/include" \
-		--extra-ldflags="-L../lame/dist/lib" \
 		&& \
-	emmake make -j && \
-	cp ffmpeg ffmpeg.bc
+	emmake make -j ffmkswt && \
+	cp ffmkswt ffmpeg.bc
+
+#		--extra-cflags="-s USE_ZLIB=1 -I../lame/dist/include" \
+#		--extra-ldflags="-L../lame/dist/lib" \
 
 EMCC_COMMON_ARGS = \
 	-O3 \
@@ -225,9 +232,14 @@ EMCC_COMMON_ARGS = \
 	-s NODEJS_CATCH_EXIT=0 \
 	-s NODEJS_CATCH_REJECTION=0 \
 	-s TOTAL_MEMORY=67108864 \
-	-lnodefs.js -lworkerfs.js \
-	--pre-js $(PRE_JS) \
+        -s MODULARIZE \
+        -s EXPORTED_RUNTIME_METHODS=['ccall'] \
+        -s EXPORTED_FUNCTIONS="['_testing1', '_testing2', '_malloc', '_free', '_maker_start', '_maker_stop', '_maker_add']" \
+        -s EXTRA_EXPORTED_RUNTIME_METHODS="['FS']" \
 	-o $@
+
+#	-lnodefs.js -lworkerfs.js \
+# 	--pre-js $(PRE_JS) \
 
 ffmpeg-webm.js: $(FFMPEG_WEBM_BC) $(PRE_JS) $(POST_JS_SYNC)
 	emcc $(FFMPEG_WEBM_BC) $(WEBM_SHARED_DEPS) \
@@ -241,10 +253,12 @@ ffmpeg-worker-webm.js: $(FFMPEG_WEBM_BC) $(PRE_JS) $(POST_JS_WORKER)
 
 ffmpeg-mp4.js: $(FFMPEG_MP4_BC) $(PRE_JS) $(POST_JS_SYNC)
 	emcc $(FFMPEG_MP4_BC) $(MP4_SHARED_DEPS) \
-		--post-js $(POST_JS_SYNC) \
 		$(EMCC_COMMON_ARGS) -O2
+
+# 		--post-js $(POST_JS_SYNC) \
 
 ffmpeg-worker-mp4.js: $(FFMPEG_MP4_BC) $(PRE_JS) $(POST_JS_WORKER)
 	emcc $(FFMPEG_MP4_BC) $(MP4_SHARED_DEPS) \
-		--post-js $(POST_JS_WORKER) \
 		$(EMCC_COMMON_ARGS) -O2
+
+#
